@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "aio-odoorpc"
 description = "Fast, simple Odoo RPC package with both a synchronous and an asynchronous client"
-version = "0.4.1"
+version = "0.4.2"
 license = "CC0-1.0"
 authors = ["mbello <mbello@users.noreply.github.com>"]
 repository = "https://github.com/mbello/odoorpc-utils"
