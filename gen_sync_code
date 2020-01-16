@@ -6,12 +6,21 @@ import os
 files = [('aio_odoorpc/async_odoorpc.py', 'aio_odoorpc/odoorpc.py'),
          ('aio_odoorpc/async_jsonrpc.py', 'aio_odoorpc/jsonrpc.py')]
 
-repl = [('async def', 'def'),
+repl = [('await resp.json() if iscoroutine(resp.json) else ', ''),
+        ('await self._http_client() if isawaitable(self._http_client) else self._http_client()', 'self._http_client()'),
+        ('from asyncio import iscoroutine', '# from asyncio import iscoroutine'),
+        ('from typing import Awaitable', '# from typing import Awaitable'),
+        ('from inspect import isawaitable', '# from inspect import isawaitable'),
+        ('import ProtoAsyncHttpClient, ProtoAsyncResponse, ', 'import ProtoHttpClient, '),
+        ('Awaitable or Callable', 'Callable'),
+        ('ProtoResponse or ProtoAsyncResponse', 'ProtoResponse'),
+        ('async def', 'def'),
         ('await ', ''),
         ('async with ', 'with '),
-        ('AsyncClient', 'Client'),
+        ('AsyncHttpClient', 'HttpClient'),
         ('AsyncOdooRPC', 'OdooRPC'),
-        ('async_jsonrpc', 'jsonrpc')]
+        ('async_jsonrpc', 'jsonrpc'),
+        ('async_odoo_', 'odoo_')]
 
 
 def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tuple]):

@@ -1,53 +1,59 @@
-from typing import Optional, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 import random
-import httpx
+from aio_odoorpc.protocols import ProtoHttpClient, ProtoResponse
+# from asyncio import iscoroutine
 
 
-def jsonrpc(*,
-            base_url: str,
-            service: str,
-            method: str,
-            ssl_verify: bool,
-            args: Optional[list] = None,
-            kwargs: Optional[dict] = None,
-            jsonrpc_url: str = "jsonrpc",
-            http_client: httpx.Client = None) -> Tuple[httpx.Response, dict]:
+def odoo_jsonrpc(*,
+                 http_client: ProtoHttpClient,
+                 service: str,
+                 method: str,
+                 args: Optional[Sequence] = None,
+                 kwargs: Optional[Mapping] = None) -> Tuple[ProtoResponse, int]:
 
     req_id = random.randint(0, 1000000000)
 
-    rpc_params = {'service': service,
-                  'method': method}
-    if args:
-        rpc_params['args'] = args
-    if kwargs:
-        rpc_params['kwargs'] = kwargs
-
     data = {'jsonrpc': '2.0',
             'method': 'call',
-            'params': rpc_params,
+            'params': {'service': service,
+                       'method': method},
             'id': req_id}
 
-    post_params = {'url': jsonrpc_url, 'json': data}
+    if args:
+        data['params']['args'] = args
+    if kwargs:
+        data['params']['kwargs'] = kwargs
 
-    if http_client:
-        resp = http_client.post(**post_params)
-    else:
-        with httpx.Client(base_url=base_url, verify=ssl_verify) as http_client:
-            resp = http_client.post(**post_params)
+    resp = http_client.post(json=data)
+    return resp, req_id
+
+
+def odoo_jsonrpc_result(*,
+                        http_client: ProtoHttpClient,
+                        service: str,
+                        method: str,
+                        args: Optional[Sequence] = None,
+                        kwargs: Optional[Mapping] = None,
+                        ensure_instance_of: Optional[type] = None) -> Any:
+
+    resp, req_id = odoo_jsonrpc(http_client=http_client,
+                                service=service,
+                                method=method,
+                                args=args,
+                                kwargs=kwargs)
 
     data = resp.json()
-    assert data['id'] == req_id, "[OdooRPC] Somehow the response id differs from the request id."
 
-    return resp, data
+    assert data.get(
+        'id') == req_id, "[OdooRPC] Somehow the response id differs from the request id."
 
-
-def jsonrpc_postprocessing(resp: httpx.Response, data: dict, instance_of: Optional[type] = None):
     if data.get('error'):
         raise RuntimeError(data['error'])
     else:
         retval = data.get('result')
         if retval is None:
             raise RuntimeError('[OdooRPC] Response with no result.')
-        if instance_of is not None:
-            assert isinstance(retval, instance_of)
+        if ensure_instance_of is not None:
+            assert isinstance(retval, ensure_instance_of), \
+                f'[OdooRPC] Result of unexpected type. Expecting {type(ensure_instance_of)}, got {type(retval)}.'
         return retval

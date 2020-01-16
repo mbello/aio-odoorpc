@@ -1,22 +1,26 @@
-from typing import List, Tuple, Optional
-from httpx import Response, Client
-from aio_odoorpc.helper import helper_build_kwargs
-from aio_odoorpc.jsonrpc import jsonrpc, jsonrpc_postprocessing
+from typing import Any, Callable, List, Optional
+from aio_odoorpc.helpers import build_execute_kw_kwargs
+from aio_odoorpc.jsonrpc import odoo_jsonrpc, odoo_jsonrpc_result
+from aio_odoorpc.protocols import ProtoHttpClient
+# from typing import Awaitable
+# from inspect import isawaitable
 
 
 class OdooRPC:
-    url: str
     database: str
     username: Optional[str]
     uid: Optional[int]
     password: str
-    ssl_verify: bool
+    _http_client: Optional[Callable or ProtoHttpClient]
 
-    def __init__(self, url: str, database: str, username_or_uid: str or int, password: str, ssl_verify: bool = True):
-        self.url = url
+    def __init__(self, *,
+                 database: str,
+                 username_or_uid: str or int,
+                 password: str,
+                 http_client: Optional[Callable] = None):
         self.database = database
         self.password = password
-        self.ssl_verify = ssl_verify
+        self._http_client = http_client
 
         if isinstance(username_or_uid, str):
             self.username = username_or_uid
@@ -25,54 +29,29 @@ class OdooRPC:
             self.uid = username_or_uid
             self.username = None
 
-    @classmethod
-    def from_cfg(cls, *,
-                 host: str,
-                 database: str,
-                 username_or_uid: str or int,
-                 password: str, port: int = None,
-                 ssl: bool = True,
-                 ssl_verify: bool = True,
-                 base_url: str = None) -> 'OdooRPC':
+    def set_http_client(self, http_client: Optional[ProtoHttpClient] = None):
+        self._http_client = http_client
 
-        url_protocol = 'https' if ssl else 'http'
-        if port is None:
-            port = 443 if ssl else 80
-
-        if (port == 80 and not ssl) or (port == 443 and ssl):
-            url_port = ""
+    def get_http_client(self, http_client: Optional[ProtoHttpClient] = None) -> ProtoHttpClient:
+        if http_client:
+            return http_client
+        if self._http_client:
+            return self._http_client()
         else:
-            url_port = f":{port}"
+            raise RuntimeError(
+                '[OdooRPC] get_http_client: no http_client callable or awaitable has been set.')
 
-        if not base_url:
-            base_url = ""
-
-        url = f'{host}{url_port}/{base_url}/'.replace('//', '/')
-        url = f'{url_protocol}://{url}'
-
-        ssl_verify = (ssl and ssl_verify)
-
-        self = cls(url=url, database=database, username_or_uid=username_or_uid,
-                   password=password, ssl_verify=ssl_verify)
-
-        if self.uid is not None:
-            self.login()
-
-        return self
-
-    def login(self, *, http_client: Optional[Client] = None) -> int or None:
+    def login(self, *, http_client: Optional[ProtoHttpClient] = None) -> int or None:
         # If uid is already set, this method is a noop
         if self.uid is not None:
             return None
 
-        resp, data = jsonrpc(base_url=self.url,
-                             service='common',
-                             method='login',
-                             ssl_verify=self.ssl_verify,
-                             args=[self.database, self.username, self.password],
-                             http_client=http_client)
-
-        self.uid = jsonrpc_postprocessing(resp, data, int)
+        self.uid = odoo_jsonrpc_result(http_client=self.get_http_client(http_client),
+                                       service='common',
+                                       method='login',
+                                       args=[self.database,
+                                             self.username, self.password],
+                                       ensure_instance_of=int)
         self.username = None
         return self.uid
 
@@ -80,13 +59,16 @@ class OdooRPC:
              model_name: str,
              ids: List[int],
              fields: Optional[List[str]] = None,
-             http_client: Optional[Client] = None) -> List[dict]:
-        r, d = self.execute_kw(method='read',
+             http_client: Optional[ProtoHttpClient] = None) -> List[dict]:
+
+        http_client = self.get_http_client(http_client)
+
+        return self.execute_kw(method='read',
                                model_name=model_name,
                                ids=[ids],
-                               kwargs=helper_build_kwargs(fields=fields),
-                               http_client=http_client)
-        return jsonrpc_postprocessing(r, d, list)
+                               kwargs=build_execute_kw_kwargs(fields=fields),
+                               http_client=http_client,
+                               ensure_instance_of=list)
 
     def search(self, *,
                model_name: str,
@@ -94,15 +76,15 @@ class OdooRPC:
                offset: Optional[int] = None,
                limit: Optional[int] = None,
                order: Optional[str] = None,
-               http_client: Optional[Client] = None) -> List[int]:
+               http_client: Optional[ProtoHttpClient] = None) -> List[int]:
 
-        r, d = self.execute_kw(method='search',
+        return self.execute_kw(method='search',
                                model_name=model_name,
                                domain=[domain],
-                               kwargs=helper_build_kwargs(
+                               kwargs=build_execute_kw_kwargs(
                                    offset=offset, limit=limit, order=order),
-                               http_client=http_client)
-        return jsonrpc_postprocessing(r, d, list)
+                               http_client=http_client,
+                               ensure_instance_of=list)
 
     def search_read(self, *,
                     model_name: str,
@@ -111,29 +93,27 @@ class OdooRPC:
                     offset: Optional[int] = None,
                     limit: Optional[int] = None,
                     order: Optional[str] = None,
-                    http_client: Optional[Client] = None) -> List[dict]:
+                    http_client: Optional[ProtoHttpClient] = None) -> List[dict]:
 
-        r, d = \
+        return \
             self.execute_kw(method='search_read',
                             model_name=model_name,
                             domain=[domain],
-                            kwargs=helper_build_kwargs(
+                            kwargs=build_execute_kw_kwargs(
                                 fields=fields, offset=offset, limit=limit, order=order),
-                            http_client=http_client)
-
-        return jsonrpc_postprocessing(r, d, list)
+                            http_client=http_client,
+                            ensure_instance_of=list)
 
     def search_count(self, *,
                      model_name: str,
                      domain: list,
-                     http_client: Optional[Client] = None) -> int:
+                     http_client: Optional[ProtoHttpClient] = None) -> int:
 
-        r, d = self.execute_kw(method='search_count',
+        return self.execute_kw(method='search_count',
                                model_name=model_name,
                                domain=[domain],
-                               http_client=http_client)
-
-        return jsonrpc_postprocessing(r, d, int)
+                               http_client=http_client,
+                               ensure_instance_of=int)
 
     def execute_kw(self, *,
                    method: str,
@@ -141,7 +121,10 @@ class OdooRPC:
                    domain: Optional[list] = None,
                    ids: Optional[List[List[int]]] = None,
                    kwargs: Optional[dict] = None,
-                   http_client: Optional[Client] = None) -> Tuple[Response, dict]:
+                   http_client: Optional[ProtoHttpClient] = None,
+                   ensure_instance_of: Optional[bool or type] = None) -> Any:
+
+        http_client = self.get_http_client(http_client)
 
         assert self.uid, '[OdooRPC] Error: uid is not set. Did you forget to call the login() method?'
 
@@ -158,11 +141,17 @@ class OdooRPC:
         if kwargs:
             args.append(kwargs)
 
-        r, d = jsonrpc(base_url=self.url,
-                       service='object',
-                       method='execute_kw',
-                       ssl_verify=self.ssl_verify,
-                       args=args,
-                       http_client=http_client)
+        if ensure_instance_of is not None:
+            if ensure_instance_of is True:
+                ensure_instance_of = None
 
-        return r, d
+            return odoo_jsonrpc_result(http_client=http_client,
+                                       service='object',
+                                       method='execute_kw',
+                                       args=args,
+                                       ensure_instance_of=ensure_instance_of)
+        else:
+            return odoo_jsonrpc(http_client=http_client,
+                                service='object',
+                                method='execute_kw',
+                                args=args)
