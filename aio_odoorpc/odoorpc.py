@@ -1,5 +1,5 @@
 from typing import List, Tuple, Optional
-from httpx import Response
+from httpx import Response, Client
 from aio_odoorpc.helper import helper_build_kwargs
 from aio_odoorpc.jsonrpc import jsonrpc, jsonrpc_postprocessing
 
@@ -60,7 +60,7 @@ class OdooRPC:
 
         return self
 
-    def login(self) -> int or None:
+    def login(self, *, http_client: Optional[Client] = None) -> int or None:
         # If uid is already set, this method is a noop
         if self.uid is not None:
             return None
@@ -69,7 +69,8 @@ class OdooRPC:
                              service='common',
                              method='login',
                              ssl_verify=self.ssl_verify,
-                             args=[self.database, self.username, self.password])
+                             args=[self.database, self.username, self.password],
+                             http_client=http_client)
 
         self.uid = jsonrpc_postprocessing(resp, data, int)
         self.username = None
@@ -78,11 +79,13 @@ class OdooRPC:
     def read(self, *,
              model_name: str,
              ids: List[int],
-             fields: Optional[List[str]] = None) -> List[dict]:
+             fields: Optional[List[str]] = None,
+             http_client: Optional[Client] = None) -> List[dict]:
         r, d = self.execute_kw(method='read',
                                model_name=model_name,
                                ids=[ids],
-                               kwargs=helper_build_kwargs(fields=fields))
+                               kwargs=helper_build_kwargs(fields=fields),
+                               http_client=http_client)
         return jsonrpc_postprocessing(r, d, list)
 
     def search(self, *,
@@ -90,12 +93,15 @@ class OdooRPC:
                domain: list,
                offset: Optional[int] = None,
                limit: Optional[int] = None,
-               order: Optional[str] = None) -> List[int]:
+               order: Optional[str] = None,
+               http_client: Optional[Client] = None) -> List[int]:
 
         r, d = self.execute_kw(method='search',
                                model_name=model_name,
                                domain=[domain],
-                               kwargs=helper_build_kwargs(offset=offset, limit=limit, order=order))
+                               kwargs=helper_build_kwargs(
+                                   offset=offset, limit=limit, order=order),
+                               http_client=http_client)
         return jsonrpc_postprocessing(r, d, list)
 
     def search_read(self, *,
@@ -104,19 +110,29 @@ class OdooRPC:
                     fields: Optional[List[str]] = None,
                     offset: Optional[int] = None,
                     limit: Optional[int] = None,
-                    order: Optional[str] = None) -> List[dict]:
+                    order: Optional[str] = None,
+                    http_client: Optional[Client] = None) -> List[dict]:
 
         r, d = \
             self.execute_kw(method='search_read',
                             model_name=model_name,
                             domain=[domain],
-                            kwargs=helper_build_kwargs(fields=fields, offset=offset, limit=limit, order=order))
+                            kwargs=helper_build_kwargs(
+                                fields=fields, offset=offset, limit=limit, order=order),
+                            http_client=http_client)
 
         return jsonrpc_postprocessing(r, d, list)
 
-    def search_count(self, *, model_name: str, domain: list) -> int:
+    def search_count(self, *,
+                     model_name: str,
+                     domain: list,
+                     http_client: Optional[Client] = None) -> int:
+
         r, d = self.execute_kw(method='search_count',
-                               model_name=model_name, domain=[domain])
+                               model_name=model_name,
+                               domain=[domain],
+                               http_client=http_client)
+
         return jsonrpc_postprocessing(r, d, int)
 
     def execute_kw(self, *,
@@ -124,7 +140,8 @@ class OdooRPC:
                    model_name: str,
                    domain: Optional[list] = None,
                    ids: Optional[List[List[int]]] = None,
-                   kwargs: Optional[dict] = None) -> Tuple[Response, dict]:
+                   kwargs: Optional[dict] = None,
+                   http_client: Optional[Client] = None) -> Tuple[Response, dict]:
 
         assert self.uid, '[OdooRPC] Error: uid is not set. Did you forget to call the login() method?'
 
@@ -145,6 +162,7 @@ class OdooRPC:
                        service='object',
                        method='execute_kw',
                        ssl_verify=self.ssl_verify,
-                       args=args)
+                       args=args,
+                       http_client=http_client)
 
         return r, d

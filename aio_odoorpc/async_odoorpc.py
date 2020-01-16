@@ -1,5 +1,5 @@
 from typing import List, Tuple, Optional
-from httpx import Response
+from httpx import Response, AsyncClient
 from aio_odoorpc.helper import helper_build_kwargs
 from aio_odoorpc.async_jsonrpc import jsonrpc, jsonrpc_postprocessing
 
@@ -60,7 +60,7 @@ class AsyncOdooRPC:
         
         return self
 
-    async def login(self) -> int or None:
+    async def login(self, *, http_client: Optional[AsyncClient] = None) -> int or None:
         # If uid is already set, this method is a noop
         if self.uid is not None:
             return None
@@ -69,7 +69,8 @@ class AsyncOdooRPC:
                                    service='common',
                                    method='login',
                                    ssl_verify=self.ssl_verify,
-                                   args=[self.database, self.username, self.password])
+                                   args=[self.database, self.username, self.password],
+                                   http_client=http_client)
     
         self.uid = await jsonrpc_postprocessing(resp, data, int)
         self.username = None
@@ -78,11 +79,13 @@ class AsyncOdooRPC:
     async def read(self, *,
                    model_name: str,
                    ids: List[int],
-                   fields: Optional[List[str]] = None) -> List[dict]:
+                   fields: Optional[List[str]] = None,
+                   http_client: Optional[AsyncClient] = None) -> List[dict]:
         r, d = await self.execute_kw(method='read',
                                      model_name=model_name,
                                      ids=[ids],
-                                     kwargs=helper_build_kwargs(fields=fields))
+                                     kwargs=helper_build_kwargs(fields=fields),
+                                     http_client=http_client)
         return await jsonrpc_postprocessing(r, d, list)
     
     async def search(self, *,
@@ -90,12 +93,14 @@ class AsyncOdooRPC:
                      domain: list,
                      offset: Optional[int] = None,
                      limit: Optional[int] = None,
-                     order: Optional[str] = None) -> List[int]:
+                     order: Optional[str] = None,
+                     http_client: Optional[AsyncClient] = None) -> List[int]:
         
         r, d = await self.execute_kw(method='search',
                                      model_name=model_name,
                                      domain=[domain],
-                                     kwargs=helper_build_kwargs(offset=offset, limit=limit, order=order))
+                                     kwargs=helper_build_kwargs(offset=offset, limit=limit, order=order),
+                                     http_client=http_client)
         return await jsonrpc_postprocessing(r, d, list)
     
     async def search_read(self, *,
@@ -104,18 +109,28 @@ class AsyncOdooRPC:
                           fields: Optional[List[str]] = None,
                           offset: Optional[int] = None,
                           limit: Optional[int] = None,
-                          order: Optional[str] = None) -> List[dict]:
+                          order: Optional[str] = None,
+                          http_client: Optional[AsyncClient] = None) -> List[dict]:
         
         r, d = \
             await self.execute_kw(method='search_read',
                                   model_name=model_name,
                                   domain=[domain],
-                                  kwargs=helper_build_kwargs(fields=fields, offset=offset, limit=limit, order=order))
+                                  kwargs=helper_build_kwargs(fields=fields, offset=offset, limit=limit, order=order),
+                                  http_client=http_client)
         
         return await jsonrpc_postprocessing(r, d, list)
     
-    async def search_count(self, *, model_name: str, domain: list) -> int:
-        r, d = await self.execute_kw(method='search_count', model_name=model_name, domain=[domain])
+    async def search_count(self, *,
+                           model_name: str,
+                           domain: list,
+                           http_client: Optional[AsyncClient] = None) -> int:
+        
+        r, d = await self.execute_kw(method='search_count',
+                                     model_name=model_name,
+                                     domain=[domain],
+                                     http_client=http_client)
+        
         return await jsonrpc_postprocessing(r, d, int)
     
     async def execute_kw(self, *,
@@ -123,7 +138,8 @@ class AsyncOdooRPC:
                          model_name: str,
                          domain: Optional[list] = None,
                          ids: Optional[List[List[int]]] = None,
-                         kwargs: Optional[dict] = None) -> Tuple[Response, dict]:
+                         kwargs: Optional[dict] = None,
+                         http_client: Optional[AsyncClient] = None) -> Tuple[Response, dict]:
         
         assert self.uid, '[OdooRPC] Error: uid is not set. Did you forget to call the login() method?'
         
@@ -144,6 +160,7 @@ class AsyncOdooRPC:
                              service='object',
                              method='execute_kw',
                              ssl_verify=self.ssl_verify,
-                             args=args)
+                             args=args,
+                             http_client=http_client)
         
         return r, d

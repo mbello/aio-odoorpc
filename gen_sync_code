@@ -8,7 +8,8 @@ files = [('aio_odoorpc/async_odoorpc.py', 'aio_odoorpc/odoorpc.py'),
 
 repl = [('async def', 'def'),
         ('await ', ''),
-        ('async with httpx.AsyncClient', 'with httpx.Client'),
+        ('async with ', 'with '),
+        ('AsyncClient', 'Client'),
         ('AsyncOdooRPC', 'OdooRPC'),
         ('async_jsonrpc', 'jsonrpc')]
 
