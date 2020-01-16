@@ -24,6 +24,15 @@ repl = [('await resp.json() if iscoroutine(resp.json) else ', ''),
 
 
 def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tuple]):
+    dt_mod_async = os.path.getmtime(filename_async)
+    try:
+        dt_mod_sync = os.path.getmtime(filename_sync)
+    except:
+        dt_mod_sync = 0
+    
+    if dt_mod_async < dt_mod_sync:
+        return
+    
     with open(filename_async, 'r') as f:
         f_async = f.read()
     
@@ -35,7 +44,8 @@ def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tu
     with open(filename_sync, 'w') as f:
         f.write(f_sync)
 
+    os.system(f'autopep8 -i {filename_sync}')
+
 
 for f in files:
     convert_async_to_sync(f[0], f[1], repl)
-    os.system(f'autopep8 -i {f[1]}')
