@@ -3,49 +3,57 @@
 from typing import List, Tuple
 import os
 
-files = [('aio_odoorpc/async_odoorpc.py', 'aio_odoorpc/odoorpc.py'),
-         ('aio_odoorpc/async_jsonrpc.py', 'aio_odoorpc/jsonrpc.py')]
+files = [('aio_odoorpc/aio_odoorpc.py', 'aio_odoorpc/odoorpc.py')]
 
-repl = [('await resp.json() if iscoroutine(resp.json) else ', ''),
-        ('await self._http_client() if isawaitable(self._http_client) else self._http_client()', 'self._http_client()'),
-        ('from asyncio import iscoroutine', '# from asyncio import iscoroutine'),
-        ('from typing import Awaitable', '# from typing import Awaitable'),
-        ('from inspect import isawaitable', '# from inspect import isawaitable'),
-        ('import ProtoAsyncHttpClient, ProtoAsyncResponse, ', 'import ProtoHttpClient, '),
-        ('Awaitable or Callable', 'Callable'),
-        ('ProtoResponse or ProtoAsyncResponse', 'ProtoResponse'),
+delete_lines = []
+
+repl = [('T_AsyncHttpClient', 'T_HttpClient'),
+        ('AsyncOdooRPC', 'OdooRPC'),
         ('async def', 'def'),
         ('await ', ''),
-        ('async with ', 'with '),
-        ('AsyncHttpClient', 'HttpClient'),
-        ('AsyncOdooRPC', 'OdooRPC'),
-        ('async_jsonrpc', 'jsonrpc'),
-        ('async_odoo_', 'odoo_')]
+        ('aio_', ''),
+        ('odoorpc', 'aio_odoorpc')]
 
 
-def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tuple]):
+def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tuple], delete_lines: List[str]):
     dt_mod_async = os.path.getmtime(filename_async)
+    dt_mod_script = os.path.getmtime(__file__)
     try:
         dt_mod_sync = os.path.getmtime(filename_sync)
     except:
         dt_mod_sync = 0
     
-    if dt_mod_async < dt_mod_sync:
+    if dt_mod_async < dt_mod_sync and dt_mod_script < dt_mod_sync:
         return
     
-    with open(filename_async, 'r') as f:
-        f_async = f.read()
+    lines = []
+    with open(filename_async, 'r') as file:
+        for line in file:
+            line_s = line.strip()
+            keep = True
+            for t in delete_lines:
+                if t == line_s:
+                    print(f'Deleted line: {t}')
+                    keep = False
+                    break
+            if keep:
+                lines.append(line)
     
+    f_async = ''.join(lines)
     f_sync = f_async
-
+    
     for t in repl:
-        f_sync = f_sync.replace(t[0], t[1])
-
+        index = f_sync.find(t[0])
+        if index >= 0:
+            f_sync = f_sync.replace(t[0], t[1])
+        else:
+            print(f'No match for rule: {t[0]} -> {t[1]}')
+    
     with open(filename_sync, 'w') as f:
         f.write(f_sync)
-
+    
     os.system(f'autopep8 -i {filename_sync}')
 
 
 for f in files:
-    convert_async_to_sync(f[0], f[1], repl)
+    convert_async_to_sync(f[0], f[1], repl, delete_lines)

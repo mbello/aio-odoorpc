@@ -1,5 +1,2 @@
-from aio_odoorpc.async_odoorpc import AsyncOdooRPC
+from aio_odoorpc.aio_odoorpc import AsyncOdooRPC
 from aio_odoorpc.odoorpc import OdooRPC
-from aio_odoorpc.helpers import build_odoo_jsonrpc_endpoint_url, build_odoo_base_url
-from aio_odoorpc.async_jsonrpc import async_odoo_jsonrpc, async_odoo_jsonrpc_result
-from aio_odoorpc.jsonrpc import odoo_jsonrpc, odoo_jsonrpc_result

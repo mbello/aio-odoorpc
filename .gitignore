@@ -17,6 +17,7 @@ _build
 pip-log.txt
 
 # Unit test / coverage reports
+.benchmarks
 .coverage
 .tox
 .pytest_cache
@@ -25,9 +26,6 @@ pip-log.txt
 .idea/*
 .python-version
 .vscode/*
-
-/test.py
-/test_*.*
 
 .venv
 /releases/*
