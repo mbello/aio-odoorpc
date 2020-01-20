@@ -25,20 +25,56 @@ async def test_async_aiohttp(url_db_user_pwd: list):
         await async_test(*url_db_user_pwd, session)
 
 
+@pytest.mark.asyncio
+async def test_async_readme1(url_db_user_pwd: list):
+    url, db, user, pwd = url_db_user_pwd
+
+    url_json_endpoint = odoo_base_url2jsonrpc_endpoint(odoo_base_url=url)
+
+    async with httpx.AsyncClient(base_url=url) as session:
+        odoo = AsyncOdooRPC(database=db, username_or_uid=user, password=pwd, http_client=session,
+                            url_jsonrpc_endpoint=url_json_endpoint)
+        await odoo.login()
+        try:
+            # A default model name has not been set a instantiation time so we should
+            # pass the model_name on every invocation. Here it should throw an exception.
+            await odoo.read()
+        except RuntimeError:
+            pass
+        else:
+            assert False, 'Expected an exception to be raised'
+        
+        # Now with model_name set it should work. Not passing a list of ids
+        # turns the read call into a search_read call with an empty domain
+        # A missing 'fields' parameter means 'fetch all fields'.
+        # Hence this call is very expensive, it fetches all fields for all
+        # 'sale.order' records
+        all_orders_all_fields = await odoo.read(model_name='sale.order')
+        
+        # creates a copy of odoo obj setting default_model_name to 'sale.order'
+        sale_order = odoo.new_for_model('sale.order')
+        
+        # now we do not need to pass model_name and it works!
+        all_orders_all_fields2 = await sale_order.read()
+        
+        large_orders = sale_order.search_read(domain=[['amount_total', '>', 10000]],
+                                              fields=['partner_id', 'amount_total', 'date_order'])
+        
+
 async def async_test(url, db, user, pwd, http_client):
     url_json_endpoint = odoo_base_url2jsonrpc_endpoint(odoo_base_url=url)
+    
     odoo = AsyncOdooRPC(database=db,
                         username_or_uid=user,
                         password=pwd,
                         http_client=http_client,
-                        url_jsonrpc_endpoint=url_json_endpoint)
+                        url_jsonrpc_endpoint=url_json_endpoint,
+                        default_model_name='sale.order')
     await odoo.login()
     limit = 10
     fields = ['partner_id', 'date_order', 'amount_total']
     
-    kwargs = {
-        'model_name': 'sale.order',
-        'domain': []}
+    kwargs = {'domain': []}
     
     data1 = asyncio.create_task(odoo.search_read(**kwargs, fields=fields))
     
