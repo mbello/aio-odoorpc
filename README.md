@@ -156,7 +156,7 @@ async with httpx.AsyncClient(base_url='https://acme.odoo.com/jsonrpc') as sessio
   You may use aio-odoorpc-base helper methods `build_odoo_base_url, build_odoo_jsonrpc_endpoint_url,
   odoo_base_url2jsonrpc_endpoint` that were described earlier in this README to build this url.
   In short, the jsonrpc endpoint is your odoo instance's base url with a 'jsonrpc' suffix:
-  https://acme.odoo.com/**jsonrpc**
+  https://acme.odoo.com/jsonrpc
 - **default_model_name**: str, optional. This parameter sets the default model_name for all method
   invocations that take an optional method_name parameter. If you set 'model_name' on a method
   invocation it will override this default and follow your order. When you have an instance of
