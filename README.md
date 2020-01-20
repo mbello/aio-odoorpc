@@ -1,6 +1,4 @@
-# aio-odoorpc
-
-##### An async Odoo RPC client (aio-odoorpc)
+# aio-odoorpc: an async Odoo RPC client
 
 This package builds upon the lower-level aio-odoorpc-base adding a AsyncOdooRPC/OdooRPC
 class as a thin layer that makes for a friendlier interface.
