@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
 from aio_odoorpc_base import execute_kw, login
 from aio_odoorpc_base.protocols import T_HttpClient
@@ -52,7 +52,7 @@ class OdooRPC:
                     limit: Optional[int] = None,
                     order: Optional[str] = None,
                     http_client: Optional[T_HttpClient] = None,
-                    setter__id_fields: Optional[Callable] = None) -> List[dict]:
+                    setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
 
         data = self.execute_kw(model_name=model_name,
                                method='search_read',
@@ -69,7 +69,7 @@ class OdooRPC:
              fields: Optional[List[str]] = None,
              order: Optional[int] = None,
              http_client: Optional[T_HttpClient] = None,
-             setter__id_fields: Optional[Callable] = None) -> List[dict]:
+             setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
 
         if ids is None:
             return self.search_read(model_name=model_name,

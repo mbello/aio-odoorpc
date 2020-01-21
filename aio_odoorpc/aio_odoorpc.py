@@ -1,4 +1,4 @@
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
 from aio_odoorpc_base import aio_execute_kw, aio_login
 from aio_odoorpc_base.protocols import T_AsyncHttpClient
@@ -50,7 +50,7 @@ class AsyncOdooRPC:
                           limit: Optional[int] = None,
                           order: Optional[str] = None,
                           http_client: Optional[T_AsyncHttpClient] = None,
-                          setter__id_fields: Optional[Callable] = None) -> List[dict]:
+                          setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
     
         aw = self.execute_kw(model_name=model_name,
                              method='search_read',
@@ -69,7 +69,7 @@ class AsyncOdooRPC:
                    fields: Optional[List[str]] = None,
                    order: Optional[int] = None,
                    http_client: Optional[T_AsyncHttpClient] = None,
-                   setter__id_fields: Optional[Callable] = None) -> List[dict]:
+                   setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
     
         if ids is None:
             return await self.search_read(model_name=model_name,

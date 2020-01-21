@@ -37,11 +37,11 @@ def _fields_processor(data: Mapping,
         return data
     
     if fields:
-        id_fields = [f for f in fields if f.endswith['_id']]
+        id_fields = [f for f in fields if f.endswith('_id')]
         if len(id_fields) == 0:
             return data
     else:
-        id_fields = [f for f in data[0].keys() if f.endswith['_id']]
+        id_fields = [f for f in data[0].keys() if f.endswith('_id')]
         if len(id_fields) == 0:
             return data
     
