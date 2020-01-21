@@ -67,18 +67,31 @@ class AsyncOdooRPC:
                    model_name: Optional[str] = None,
                    ids: Optional[List[int]] = None,
                    fields: Optional[List[str]] = None,
+                   offset: Optional[int] = None,
+                   limit: Optional[int] = None,
                    order: Optional[int] = None,
                    http_client: Optional[T_AsyncHttpClient] = None,
                    setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
-    
+            
         if ids is None:
             return await self.search_read(model_name=model_name,
                                           fields=fields,
+                                          offset=offset,
+                                          limit=limit,
                                           order=order,
                                           http_client=http_client)
         elif isinstance(ids, list) and len(ids) == 0:
             return list()
         else:
+            if offset:
+                if offset >= len(ids):
+                    return list()
+                else:
+                    ids = ids[offset:]
+            if limit:
+                limit = min(limit, len(ids))
+                ids = ids[:limit-1]
+            
             aw = self.execute_kw(model_name=model_name,
                                  method='read',
                                  method_arg=ids,
