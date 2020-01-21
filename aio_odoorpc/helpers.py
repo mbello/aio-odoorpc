@@ -11,23 +11,25 @@ async def _aio_fields_processor(awaitable: Awaitable,
     id_fields = None
     
     if fields:
-        id_fields = [f for f in fields if f.endswith('_id')]
+        id_fields = [f for f in fields if f.endswith('_id') or f.endswith('_uid')]
         if len(id_fields) == 0:
             return await awaitable
     
-    res = await awaitable
+    data = await awaitable
     
-    if not res:
-        return res
+    if not data:
+        return data
     else:
         if not id_fields:
-            id_fields = [f for f in res[0].keys() if f.endswith('_id')]
+            id_fields = [f for f in data[0].keys() if f.endswith('_id') or f.endswith('_uid')]
             if len(id_fields) == 0:
-                return res
+                return data
     
-    for r in res:
+    for r in data:
         for f in id_fields:
             r[f] = setter__id_fields(r[f])
+
+    return data
 
 
 def _fields_processor(data: Mapping,
@@ -37,17 +39,19 @@ def _fields_processor(data: Mapping,
         return data
     
     if fields:
-        id_fields = [f for f in fields if f.endswith('_id')]
+        id_fields = [f for f in fields if f.endswith('_id') or f.endswith('_uid')]
         if len(id_fields) == 0:
             return data
     else:
-        id_fields = [f for f in data[0].keys() if f.endswith('_id')]
+        id_fields = [f for f in data[0].keys() if f.endswith('_id') or f.endswith('_uid')]
         if len(id_fields) == 0:
             return data
     
     for r in data:
         for f in id_fields:
             r[f] = setter__id_fields(r[f])
+    
+    return data
 
 
 def setter__id_id_as_int(id: Optional[Union[list, bool]] = None) -> Optional[int]:

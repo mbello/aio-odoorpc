@@ -1,6 +1,7 @@
 import pytest
 from aio_odoorpc_base.helpers import odoo_base_url2jsonrpc_endpoint
 from aio_odoorpc import AsyncOdooRPC
+from aio_odoorpc.helpers import setter__id_id_as_int
 import httpx
 import aiohttp
 import asyncio
@@ -59,8 +60,23 @@ async def test_async_readme1(url_db_user_pwd: list):
         
         large_orders = sale_order.search_read(domain=[['amount_total', '>', 10000]],
                                               fields=['partner_id', 'amount_total', 'date_order'])
-        
 
+
+@pytest.mark.asyncio
+async def test_bug_return_none(url_db_user_pwd: list):
+    url, db, user, pwd = url_db_user_pwd
+    url_json_endpoint = odoo_base_url2jsonrpc_endpoint(odoo_base_url=url)
+    
+    async with httpx.AsyncClient(base_url=url) as session:
+        odoo = AsyncOdooRPC(database=db, username_or_uid=user, password=pwd, http_client=session,
+                            url_jsonrpc_endpoint=url_json_endpoint)
+        await odoo.login()
+        
+        test = await odoo.search_read(model_name='sale.order', domain=[],
+                                      fields=[], setter__id_fields=setter__id_id_as_int)
+        assert test is not None
+
+    
 async def async_test(url, db, user, pwd, http_client):
     url_json_endpoint = odoo_base_url2jsonrpc_endpoint(odoo_base_url=url)
     
