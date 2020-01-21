@@ -11,7 +11,7 @@ async def _aio_fields_processor(awaitable: Awaitable,
     id_fields = None
     
     if fields:
-        id_fields = [f for f in fields if f.endswith['_id']]
+        id_fields = [f for f in fields if f.endswith('_id')]
         if len(id_fields) == 0:
             return await awaitable
     
@@ -21,7 +21,7 @@ async def _aio_fields_processor(awaitable: Awaitable,
         return res
     else:
         if not id_fields:
-            id_fields = [f for f in res[0].keys() if f.endswith['_id']]
+            id_fields = [f for f in res[0].keys() if f.endswith('_id')]
             if len(id_fields) == 0:
                 return res
     
