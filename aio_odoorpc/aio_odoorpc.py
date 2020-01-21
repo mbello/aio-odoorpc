@@ -1,7 +1,9 @@
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
 from aio_odoorpc_base import aio_execute_kw, aio_login
 from aio_odoorpc_base.protocols import T_AsyncHttpClient
+from aio_odoorpc.helpers import _aio_fields_processor
+import asyncio
 
 
 class AsyncOdooRPC:
@@ -40,72 +42,6 @@ class AsyncOdooRPC:
         new.model_name = default_model_name
         return new
 
-    def __base_args(self, http_client: Optional[T_AsyncHttpClient] = None) -> Tuple:
-        http_client = http_client if http_client is not None else self.http_client
-        if http_client is None:
-            raise RuntimeError('[aio-odoorpc] Error: no http client has been set.')
-        return http_client, self.url
-        
-    def __base_kwargs(self, model_name):
-        model_name = model_name if model_name else self.model_name
-        
-        if not self.uid:
-            raise RuntimeError(f'[aio-odoorpc] Error: uid has not been set. (did you forget to login?)')
-        if not model_name:
-            raise RuntimeError(f'[aio-odoorpc] Error: model_name has not been set. '
-                               f'Either set default_model_name or pass it in the parameter list.')
-        
-        return {'database': self.database, 'uid': self.uid, 'password': self.password, 'model_name': model_name}
-        
-    async def login(self, *, http_client: Optional[T_AsyncHttpClient] = None, force: bool = False) -> int or None:
-        # If uid is already set, this method is a noop
-        if not force and self.uid is not None:
-            return None
-        
-        if self.username is None:
-            raise RuntimeError('[aio-odoorpc] Error: invoked login but username is not set.')
-        
-        self.uid = await aio_login(*self.__base_args(http_client),
-                                   database=self.database,
-                                   username=self.username,
-                                   password=self.password)
-        return self.uid
-
-    async def read(self, *,
-                   model_name: Optional[str] = None,
-                   ids: Optional[List[int]] = None,
-                   fields: Optional[List[str]] = None,
-                   order: Optional[int] = None,
-                   http_client: Optional[T_AsyncHttpClient] = None) -> List[dict]:
-    
-        if ids is None:
-            return await self.search_read(model_name=model_name,
-                                          fields=fields,
-                                          order=order,
-                                          http_client=http_client)
-        elif not ids:
-            return list()
-        else:
-            return await aio_execute_kw(*self.__base_args(http_client),
-                                        **self.__base_kwargs(model_name),
-                                        method='read',
-                                        domain_or_ids=ids,
-                                        kwargs=build_execute_kw_kwargs(fields=fields))
-    
-    async def search(self, *,
-                     model_name: Optional[str] = None,
-                     domain: list = tuple(),
-                     offset: Optional[int] = None,
-                     limit: Optional[int] = None,
-                     order: Optional[str] = None,
-                     http_client: Optional[T_AsyncHttpClient] = None) -> List[int]:
-        
-        return await aio_execute_kw(*self.__base_args(http_client),
-                                    **self.__base_kwargs(model_name),
-                                    method='search',
-                                    domain_or_ids=domain,
-                                    kwargs=build_execute_kw_kwargs(offset=offset, limit=limit, order=order))
-    
     async def search_read(self, *,
                           model_name: Optional[str] = None,
                           domain: list = tuple(),
@@ -113,21 +49,109 @@ class AsyncOdooRPC:
                           offset: Optional[int] = None,
                           limit: Optional[int] = None,
                           order: Optional[str] = None,
-                          http_client: Optional[T_AsyncHttpClient] = None) -> List[dict]:
+                          http_client: Optional[T_AsyncHttpClient] = None,
+                          setter__id_fields: Optional[Callable] = None) -> List[dict]:
     
-        return await aio_execute_kw(*self.__base_args(http_client),
-                                    **self.__base_kwargs(model_name),
-                                    method='search_read',
-                                    domain_or_ids=domain,
-                                    kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
-                                                                   limit=limit, order=order))
+        aw = self.execute_kw(model_name=model_name,
+                             method='search_read',
+                             method_arg=domain,
+                             method_kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
+                                                                   limit=limit, order=order),
+                             http_client=http_client)
+
+        aw = asyncio.create_task(aw)
+        await asyncio.sleep(0)
+        return await _aio_fields_processor(awaitable=aw, fields=fields, setter__id_fields=setter__id_fields)
+
+    async def read(self, *,
+                   model_name: Optional[str] = None,
+                   ids: Optional[List[int]] = None,
+                   fields: Optional[List[str]] = None,
+                   order: Optional[int] = None,
+                   http_client: Optional[T_AsyncHttpClient] = None,
+                   setter__id_fields: Optional[Callable] = None) -> List[dict]:
+    
+        if ids is None:
+            return await self.search_read(model_name=model_name,
+                                          fields=fields,
+                                          order=order,
+                                          http_client=http_client)
+        elif isinstance(ids, list) and len(ids) == 0:
+            return list()
+        else:
+            aw = self.execute_kw(model_name=model_name,
+                                 method='read',
+                                 method_arg=ids,
+                                 method_kwargs=build_execute_kw_kwargs(fields=fields),
+                                 http_client=http_client)
+            aw = asyncio.create_task(aw)
+            await asyncio.sleep(0)
+            return await _aio_fields_processor(awaitable=aw, fields=fields, setter__id_fields=setter__id_fields)
+            
+    async def search(self, *,
+                     model_name: Optional[str] = None,
+                     domain: list = tuple(),
+                     offset: Optional[int] = None,
+                     limit: Optional[int] = None,
+                     order: Optional[str] = None,
+                     http_client: Optional[T_AsyncHttpClient] = None) -> List[int]:
+    
+        return await self.execute_kw(model_name=model_name,
+                                     method='search',
+                                     method_arg=domain,
+                                     method_kwargs=build_execute_kw_kwargs(offset=offset, limit=limit, order=order),
+                                     http_client=http_client)
 
     async def search_count(self, *,
                            model_name: Optional[str] = None,
                            domain: list = tuple(),
                            http_client: Optional[T_AsyncHttpClient] = None) -> int:
     
+        return await self.execute_kw(model_name=model_name,
+                                     method='search_count',
+                                     method_arg=domain,
+                                     http_client=http_client)
+
+    def __base_args(self, http_client: Optional[T_AsyncHttpClient] = None) -> Tuple:
+        http_client = http_client if http_client is not None else self.http_client
+        if http_client is None:
+            raise RuntimeError('[aio-odoorpc] Error: no http client has been set.')
+        return http_client, self.url
+
+    def __base_kwargs(self, model_name):
+        model_name = model_name if model_name else self.model_name
+    
+        if not self.uid:
+            raise RuntimeError(f'[aio-odoorpc] Error: uid has not been set. (did you forget to login?)')
+        if not model_name:
+            raise RuntimeError(f'[aio-odoorpc] Error: model_name has not been set. '
+                               f'Either set default_model_name or pass it in the parameter list.')
+    
+        return {'database': self.database, 'uid': self.uid, 'password': self.password, 'model_name': model_name}
+
+    async def login(self, *, http_client: Optional[T_AsyncHttpClient] = None, force: bool = False) -> int or None:
+        # If uid is already set, this method is a noop
+        if not force and self.uid is not None:
+            return None
+    
+        if self.username is None:
+            raise RuntimeError('[aio-odoorpc] Error: invoked login but username is not set.')
+    
+        self.uid = await aio_login(*self.__base_args(http_client),
+                                   database=self.database,
+                                   username=self.username,
+                                   password=self.password)
+        return self.uid
+
+    async def execute_kw(self,
+                         model_name: Optional[str] = None, *,
+                         method: str,
+                         method_arg: Optional[list] = tuple(),
+                         method_kwargs: Optional[dict] = None,
+                         http_client: Optional[T_AsyncHttpClient] = None):
+        
         return await aio_execute_kw(*self.__base_args(http_client),
                                     **self.__base_kwargs(model_name),
-                                    method='search_count',
-                                    domain_or_ids=domain)
+                                    method=method,
+                                    method_arg=method_arg,
+                                    method_kwargs=method_kwargs)

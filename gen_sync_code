@@ -5,12 +5,16 @@ import os
 
 files = [('aio_odoorpc/aio_odoorpc.py', 'aio_odoorpc/odoorpc.py')]
 
-delete_lines = []
+delete_lines = ['aw = asyncio.create_task(aw)',
+                'await asyncio.sleep(0)']
 
 repl = [('T_AsyncHttpClient', 'T_HttpClient'),
         ('AsyncOdooRPC', 'OdooRPC'),
         ('async def', 'def'),
+        ('aw = self.execute_kw', 'data = self.execute_kw'),
+        ('(awaitable=aw', '(data=data'),
         ('await ', ''),
+        ('_aio_', '_'),
         ('aio_', ''),
         ('odoorpc', 'aio_odoorpc')]
 

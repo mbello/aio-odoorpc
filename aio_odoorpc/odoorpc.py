@@ -1,7 +1,9 @@
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
 from aio_odoorpc_base import execute_kw, login
 from aio_odoorpc_base.protocols import T_HttpClient
+from aio_odoorpc.helpers import _fields_processor
+import asyncio
 
 
 class OdooRPC:
@@ -42,6 +44,74 @@ class OdooRPC:
         new.model_name = default_model_name
         return new
 
+    def search_read(self, *,
+                    model_name: Optional[str] = None,
+                    domain: list = tuple(),
+                    fields: Optional[List[str]] = None,
+                    offset: Optional[int] = None,
+                    limit: Optional[int] = None,
+                    order: Optional[str] = None,
+                    http_client: Optional[T_HttpClient] = None,
+                    setter__id_fields: Optional[Callable] = None) -> List[dict]:
+
+        data = self.execute_kw(model_name=model_name,
+                               method='search_read',
+                               method_arg=domain,
+                               method_kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
+                                                                     limit=limit, order=order),
+                               http_client=http_client)
+
+        return _fields_processor(data=data, fields=fields, setter__id_fields=setter__id_fields)
+
+    def read(self, *,
+             model_name: Optional[str] = None,
+             ids: Optional[List[int]] = None,
+             fields: Optional[List[str]] = None,
+             order: Optional[int] = None,
+             http_client: Optional[T_HttpClient] = None,
+             setter__id_fields: Optional[Callable] = None) -> List[dict]:
+
+        if ids is None:
+            return self.search_read(model_name=model_name,
+                                    fields=fields,
+                                    order=order,
+                                    http_client=http_client)
+        elif isinstance(ids, list) and len(ids) == 0:
+            return list()
+        else:
+            data = self.execute_kw(model_name=model_name,
+                                   method='read',
+                                   method_arg=ids,
+                                   method_kwargs=build_execute_kw_kwargs(
+                                       fields=fields),
+                                   http_client=http_client)
+            return _fields_processor(data=data, fields=fields, setter__id_fields=setter__id_fields)
+
+    def search(self, *,
+               model_name: Optional[str] = None,
+               domain: list = tuple(),
+               offset: Optional[int] = None,
+               limit: Optional[int] = None,
+               order: Optional[str] = None,
+               http_client: Optional[T_HttpClient] = None) -> List[int]:
+
+        return self.execute_kw(model_name=model_name,
+                               method='search',
+                               method_arg=domain,
+                               method_kwargs=build_execute_kw_kwargs(
+                                   offset=offset, limit=limit, order=order),
+                               http_client=http_client)
+
+    def search_count(self, *,
+                     model_name: Optional[str] = None,
+                     domain: list = tuple(),
+                     http_client: Optional[T_HttpClient] = None) -> int:
+
+        return self.execute_kw(model_name=model_name,
+                               method='search_count',
+                               method_arg=domain,
+                               http_client=http_client)
+
     def __base_args(self, http_client: Optional[T_HttpClient] = None) -> Tuple:
         http_client = http_client if http_client is not None else self.http_client
         if http_client is None:
@@ -75,63 +145,15 @@ class OdooRPC:
                          password=self.password)
         return self.uid
 
-    def read(self, *,
-             model_name: Optional[str] = None,
-             ids: Optional[List[int]] = None,
-             fields: Optional[List[str]] = None,
-             order: Optional[int] = None,
-             http_client: Optional[T_HttpClient] = None) -> List[dict]:
-
-        if ids is None:
-            return self.search_read(model_name=model_name,
-                                    fields=fields,
-                                    order=order,
-                                    http_client=http_client)
-        elif not ids:
-            return list()
-        else:
-            return execute_kw(*self.__base_args(http_client),
-                              **self.__base_kwargs(model_name),
-                              method='read',
-                              domain_or_ids=ids,
-                              kwargs=build_execute_kw_kwargs(fields=fields))
-
-    def search(self, *,
-               model_name: Optional[str] = None,
-               domain: list = tuple(),
-               offset: Optional[int] = None,
-               limit: Optional[int] = None,
-               order: Optional[str] = None,
-               http_client: Optional[T_HttpClient] = None) -> List[int]:
+    def execute_kw(self,
+                   model_name: Optional[str] = None, *,
+                   method: str,
+                   method_arg: Optional[list] = tuple(),
+                   method_kwargs: Optional[dict] = None,
+                   http_client: Optional[T_HttpClient] = None):
 
         return execute_kw(*self.__base_args(http_client),
                           **self.__base_kwargs(model_name),
-                          method='search',
-                          domain_or_ids=domain,
-                          kwargs=build_execute_kw_kwargs(offset=offset, limit=limit, order=order))
-
-    def search_read(self, *,
-                    model_name: Optional[str] = None,
-                    domain: list = tuple(),
-                    fields: Optional[List[str]] = None,
-                    offset: Optional[int] = None,
-                    limit: Optional[int] = None,
-                    order: Optional[str] = None,
-                    http_client: Optional[T_HttpClient] = None) -> List[dict]:
-
-        return execute_kw(*self.__base_args(http_client),
-                          **self.__base_kwargs(model_name),
-                          method='search_read',
-                          domain_or_ids=domain,
-                          kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
-                                                         limit=limit, order=order))
-
-    def search_count(self, *,
-                     model_name: Optional[str] = None,
-                     domain: list = tuple(),
-                     http_client: Optional[T_HttpClient] = None) -> int:
-
-        return execute_kw(*self.__base_args(http_client),
-                          **self.__base_kwargs(model_name),
-                          method='search_count',
-                          domain_or_ids=domain)
+                          method=method,
+                          method_arg=method_arg,
+                          method_kwargs=method_kwargs)
