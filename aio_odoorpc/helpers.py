@@ -55,6 +55,8 @@ def _fields_processor(data: Mapping,
 
 
 def setter__id_id_as_int(id: Optional[Union[list, bool]] = None) -> Optional[int]:
+    if not id:
+        return None
     if isinstance(id, list) and list:
         return id[0] if id else None
     elif isinstance(id, int):
