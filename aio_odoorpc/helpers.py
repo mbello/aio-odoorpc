@@ -55,7 +55,12 @@ def _fields_processor(data: Mapping,
 
 
 def setter__id_id_as_int(id: Optional[Union[list, bool]] = None) -> Optional[int]:
-    return id[0] if id else None
+    if isinstance(id, list) and list:
+        return id[0] if id else None
+    elif isinstance(id, int):
+        return id
+    else:
+        RuntimeError(f'[aio-odoorpc] setter__id_as_int: id of type {type(id)}')
 
 
 def setter__id_list_of_int(id: Optional[Union[list, bool]] = None) -> Optional[List[int]]:
