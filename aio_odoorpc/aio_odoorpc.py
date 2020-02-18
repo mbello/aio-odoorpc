@@ -12,6 +12,7 @@ class AsyncOdooRPC:
     uid: Optional[int]
     password: str
     http_client: T_AsyncHttpClient
+    url: Optional[str]
     model_name: Optional[str]
     
     def __init__(self, *,
