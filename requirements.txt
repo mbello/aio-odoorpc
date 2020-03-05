@@ -1,1 +1,1 @@
-aio-odoorpc-base==2.0.1
+aio-odoorpc-base==2.0.4
