@@ -2,6 +2,12 @@ from typing import Awaitable, Callable, Dict, Iterable, List, Mapping, Optional,
 import asyncio
 
 
+# from Odoo sources
+DEFAULT_SERVER_DATE_FORMAT: str = "%Y-%m-%d"
+DEFAULT_SERVER_TIME_FORMAT: str = "%H:%M:%S"
+DEFAULT_SERVER_DATETIME_FORMAT = f"{DEFAULT_SERVER_DATE_FORMAT} {DEFAULT_SERVER_TIME_FORMAT}"
+
+
 async def _aio_fields_processor(awaitable: Awaitable,
                                 fields: Optional[Iterable] = None,
                                 setter__id_fields: Optional[Callable] = None):
