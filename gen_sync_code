@@ -8,15 +8,14 @@ files = [('aio_odoorpc/aio_odoorpc.py', 'aio_odoorpc/odoorpc.py')]
 delete_lines = ['aw = asyncio.create_task(aw)',
                 'await asyncio.sleep(0)']
 
-repl = [('T_AsyncHttpClient', 'T_HttpClient'),
+repl = [('aio_odoorpc_base.aio', 'aio_odoorpc_base.sync'),
+        ('T_AsyncHttpClient', 'T_HttpClient'),
         ('AsyncOdooRPC', 'OdooRPC'),
         ('async def', 'def'),
         ('aw = self.execute_kw', 'data = self.execute_kw'),
         ('(awaitable=aw', '(data=data'),
         ('await ', ''),
-        ('_aio_', '_'),
-        ('aio_', ''),
-        ('odoorpc', 'aio_odoorpc')]
+        ('_aio_', '_')]
 
 
 def convert_async_to_sync(filename_async: str, filename_sync: str, repl: List[Tuple], delete_lines: List[str]):

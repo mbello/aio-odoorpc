@@ -1,6 +1,6 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
-from aio_odoorpc_base import execute_kw, login
+from aio_odoorpc_base.sync import execute_kw, login
 from aio_odoorpc_base.protocols import T_HttpClient
 from aio_odoorpc.helpers import _fields_processor
 import asyncio
@@ -130,19 +130,19 @@ class OdooRPC:
         http_client = http_client if http_client is not None else self.http_client
         if http_client is None:
             raise RuntimeError(
-                '[aio-aio_odoorpc] Error: no http client has been set.')
+                '[aio-odoorpc] Error: no http client has been set.')
         return http_client, self.url
 
     def __base_kwargs(self, model_name):
         model_name = model_name if model_name else self.model_name
 
         if not self.uid:
-            raise RuntimeError(f'[aio-aio_odoorpc] Error: uid has not been set. (did you forget to login?)')
+            raise RuntimeError(f'[aio-odoorpc] Error: uid has not been set. (did you forget to login?)')
         if not model_name:
-            raise RuntimeError(f'[aio-aio_odoorpc] Error: model_name has not been set. '
+            raise RuntimeError(f'[aio-odoorpc] Error: model_name has not been set. '
                                f'Either set default_model_name or pass it in the parameter list.')
 
-        return {'database': self.database, 'uid': self.uid, 'password': self.password, 'model_name': model_name}
+        return {'db': self.database, 'uid': self.uid, 'password': self.password, 'obj': model_name}
 
     def login(self, *, http_client: Optional[T_HttpClient] = None, force: bool = False) -> int or None:
         # If uid is already set, this method is a noop
@@ -151,11 +151,11 @@ class OdooRPC:
 
         if self.username is None:
             raise RuntimeError(
-                '[aio-aio_odoorpc] Error: invoked login but username is not set.')
+                '[aio-odoorpc] Error: invoked login but username is not set.')
 
         self.uid = login(*self.__base_args(http_client),
-                         database=self.database,
-                         username=self.username,
+                         db=self.database,
+                         login=self.username,
                          password=self.password)
         return self.uid
 
@@ -169,5 +169,5 @@ class OdooRPC:
         return execute_kw(*self.__base_args(http_client),
                           **self.__base_kwargs(model_name),
                           method=method,
-                          method_arg=method_arg,
-                          method_kwargs=method_kwargs)
+                          args=method_arg,
+                          kw=method_kwargs)

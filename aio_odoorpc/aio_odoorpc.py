@@ -1,6 +1,6 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
 from aio_odoorpc_base.helpers import build_execute_kw_kwargs
-from aio_odoorpc_base import aio_execute_kw, aio_login
+from aio_odoorpc_base.aio import execute_kw, login
 from aio_odoorpc_base.protocols import T_AsyncHttpClient
 from aio_odoorpc.helpers import _aio_fields_processor
 import asyncio
@@ -141,7 +141,7 @@ class AsyncOdooRPC:
             raise RuntimeError(f'[aio-odoorpc] Error: model_name has not been set. '
                                f'Either set default_model_name or pass it in the parameter list.')
     
-        return {'database': self.database, 'uid': self.uid, 'password': self.password, 'model_name': model_name}
+        return {'db': self.database, 'uid': self.uid, 'password': self.password, 'obj': model_name}
 
     async def login(self, *, http_client: Optional[T_AsyncHttpClient] = None, force: bool = False) -> int or None:
         # If uid is already set, this method is a noop
@@ -151,10 +151,10 @@ class AsyncOdooRPC:
         if self.username is None:
             raise RuntimeError('[aio-odoorpc] Error: invoked login but username is not set.')
     
-        self.uid = await aio_login(*self.__base_args(http_client),
-                                   database=self.database,
-                                   username=self.username,
-                                   password=self.password)
+        self.uid = await login(*self.__base_args(http_client),
+                               db=self.database,
+                               login=self.username,
+                               password=self.password)
         return self.uid
 
     async def execute_kw(self,
@@ -164,8 +164,8 @@ class AsyncOdooRPC:
                          method_kwargs: Optional[dict] = None,
                          http_client: Optional[T_AsyncHttpClient] = None):
         
-        return await aio_execute_kw(*self.__base_args(http_client),
-                                    **self.__base_kwargs(model_name),
-                                    method=method,
-                                    method_arg=method_arg,
-                                    method_kwargs=method_kwargs)
+        return await execute_kw(*self.__base_args(http_client),
+                                **self.__base_kwargs(model_name),
+                                method=method,
+                                args=method_arg,
+                                kw=method_kwargs)
