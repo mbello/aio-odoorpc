@@ -1,10 +1,22 @@
-from typing import Any, Callable, List, Optional, Tuple, Union
-from aio_odoorpc_base.helpers import build_execute_kw_kwargs
+from typing import overload, Any, Callable, List, Literal, Optional, Tuple, Union
+from aio_odoorpc_base.helpers import execute_kwargs
 from aio_odoorpc_base.aio import execute_kw, login
 from aio_odoorpc_base.protocols import T_AsyncHttpClient
 from aio_odoorpc.helpers import _aio_fields_processor
+from aio_odoorpc import helpers
 import asyncio
 
+
+# Domain operators.
+DOMAIN_OPERATORS = ('!', '|', '&')
+TERM_OPERATORS = ('=', '!=', '<>', '<=', '<', '>', '>=', '=?', '=like', '=ilike', 'like', 'not like', 'ilike',
+                  'not ilike', 'in', 'not in', 'child_of', 'parent_of')
+
+
+T_Domain = List[Union[Literal['!', '|', '&'],
+                      Tuple[str, Literal['=', '!=', '<>', '<=', '<', '>', '>=', '=?', '=like',
+                                         '=ilike', 'like', 'not like', 'ilike', 'not ilike', 'in',
+                                         'not in', 'child_of', 'parent_of'], Any]]]
 
 class AsyncOdooRPC:
     database: str
@@ -43,45 +55,72 @@ class AsyncOdooRPC:
         new.model_name = default_model_name
         return new
 
-    async def search_read(self, *,
-                          model_name: Optional[str] = None,
-                          domain: list = tuple(),
+    @overload
+    def set_format_for_id_fields(self,
+                                 type: Literal['int'],
+                                 id_only: Literal[True],
+                                 value_for_empty_id: Any):
+        ...
+
+    @overload
+    def set_format_for_id_fields(self,
+                                 type: Literal['noop', 'tuple', 'dict', 'list_of_dict'],
+                                 id_only: bool,
+                                 value_for_empty_id: Any):
+        ...
+    
+    def set_format_for_id_fields(self,
+                                 type = 'dict',
+                                 id_only = False,
+                                 value_for_empty_id = False):
+        if not isinstance(type, str) \
+           or not isinstance(id_only, bool) \
+           or type not in ('noop', 'int', 'tuple', 'dict', 'list_of_dict'):
+            raise ValueError('set_format_for_id_fields called with invalid parameters')
+        
+        if type == 'noop' or (type == 'dict' and id_only == False and value_for_empty_id == False):
+            self.setter_for__id_fields = None
+            return
+        
+        if type == 'int':
+            self.setter_for__id_fields = lambda x:
+        elif type == 'tuple':
+            self.setter_for__id_fields = helpers.setter__id_tuple_id()
+        elif type == 'dict':
+            self.setter_for__id_fields = helpers.setter__id_dict_id
+        elif type == 'list_of_dict':
+            self.setter_for__id_fields = helpers.setter__id_list_dict_id
+        
+
+    async def search_read(self, domain: T_Domain, *,
                           fields: Optional[List[str]] = None,
                           offset: Optional[int] = None,
                           limit: Optional[int] = None,
                           order: Optional[str] = None,
-                          http_client: Optional[T_AsyncHttpClient] = None,
-                          setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
+                          setter__id_fields: Optional[Callable[[List], Any]] = None,
+                          model_name: Optional[str] = None,
+                          http_client: Optional[T_AsyncHttpClient] = None) -> List[dict]:
     
-        aw = self.execute_kw(model_name=model_name,
-                             method='search_read',
-                             method_arg=domain,
-                             method_kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
-                                                                   limit=limit, order=order),
+        aw = self.execute_kw(method='search_read',
+                             args=domain,
+                             kwargs=execute_kwargs(fields=fields, offset=offset, limit=limit, order=order),
+                             model_name=model_name,
                              http_client=http_client)
 
         aw = asyncio.create_task(aw)
         await asyncio.sleep(0)
         return await _aio_fields_processor(awaitable=aw, fields=fields, setter__id_fields=setter__id_fields)
 
-    async def read(self, *,
-                   model_name: Optional[str] = None,
-                   ids: Optional[List[int]] = None,
+    async def read(self, ids: List[int], *,
                    fields: Optional[List[str]] = None,
                    offset: Optional[int] = None,
                    limit: Optional[int] = None,
-                   order: Optional[int] = None,
-                   http_client: Optional[T_AsyncHttpClient] = None,
-                   setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
+                   model_name: Optional[str] = None,
+                   http_client: Optional[T_AsyncHttpClient] = None) -> List[dict]:
             
-        if ids is None:
-            return await self.search_read(model_name=model_name,
-                                          fields=fields,
-                                          offset=offset,
-                                          limit=limit,
-                                          order=order,
-                                          http_client=http_client)
-        elif isinstance(ids, list) and len(ids) == 0:
+        if not isinstance(ids, list):
+            raise ValueError('ids must be a list of ids (list of ints)')
+        if len(ids) <= 0:
             return list()
         else:
             if offset:
@@ -93,38 +132,49 @@ class AsyncOdooRPC:
                 limit = min(limit, len(ids))
                 ids = ids[:limit-1]
             
-            aw = self.execute_kw(model_name=model_name,
-                                 method='read',
-                                 method_arg=ids,
-                                 method_kwargs=build_execute_kw_kwargs(fields=fields),
+            aw = self.execute_kw(method='read',
+                                 args=ids,
+                                 kwargs=execute_kwargs(fields=fields),
+                                 model_name=model_name,
                                  http_client=http_client)
             aw = asyncio.create_task(aw)
             await asyncio.sleep(0)
-            return await _aio_fields_processor(awaitable=aw, fields=fields, setter__id_fields=setter__id_fields)
+            return await _aio_fields_processor(awaitable=aw, fields=fields,
+                                               setter__id_fields=self.setter__id_fields)
             
-    async def search(self, *,
-                     model_name: Optional[str] = None,
-                     domain: list = tuple(),
+    async def search(self, domain: T_Domain, *,
                      offset: Optional[int] = None,
                      limit: Optional[int] = None,
                      order: Optional[str] = None,
+                     count: Optional[bool] = None,
+                     model_name: Optional[str] = None,
                      http_client: Optional[T_AsyncHttpClient] = None) -> List[int]:
     
-        return await self.execute_kw(model_name=model_name,
-                                     method='search',
-                                     method_arg=domain,
-                                     method_kwargs=build_execute_kw_kwargs(offset=offset, limit=limit, order=order),
+        return await self.execute_kw(method='search',
+                                     args=domain,
+                                     kwargs=execute_kwargs(offset=offset, limit=limit, order=order,
+                                                                    count=count),
+                                     model_name=model_name,
                                      http_client=http_client)
 
-    async def search_count(self, *,
+    async def search_count(self, domain: T_Domain, *,
                            model_name: Optional[str] = None,
-                           domain: list = tuple(),
                            http_client: Optional[T_AsyncHttpClient] = None) -> int:
     
-        return await self.execute_kw(model_name=model_name,
-                                     method='search_count',
-                                     method_arg=domain,
+        return await self.execute_kw(method='search_count',
+                                     args=domain,
+                                     model_name=model_name,
                                      http_client=http_client)
+
+
+    async def copy_data(self, model_name: Optional[str] = None, *,
+                        id: int, http_client: Optional[T_AsyncHttpClient] = None):
+
+    async def write(self, *,
+                    model_name: Optional[str] = None,
+                    ids: List[int],
+                    http_client: Optional[T_AsyncHttpClient] = None):
+
 
     def __base_args(self, http_client: Optional[T_AsyncHttpClient] = None) -> Tuple:
         http_client = http_client if http_client is not None else self.http_client
@@ -158,14 +208,14 @@ class AsyncOdooRPC:
         return self.uid
 
     async def execute_kw(self,
-                         model_name: Optional[str] = None, *,
                          method: str,
-                         method_arg: Optional[list] = tuple(),
-                         method_kwargs: Optional[dict] = None,
+                         args: Optional[list] = tuple(),
+                         kwargs: Optional[dict] = None, *,
+                         model_name: Optional[str] = None,
                          http_client: Optional[T_AsyncHttpClient] = None):
         
         return await execute_kw(*self.__base_args(http_client),
                                 **self.__base_kwargs(model_name),
                                 method=method,
-                                args=method_arg,
-                                kw=method_kwargs)
+                                args=args,
+                                kw=kwargs)

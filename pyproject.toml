@@ -12,7 +12,7 @@ keywords = ['odoorpc', 'asyncio', 'jsonrpc', 'odoo', 'ERPpeek']
 
 [tool.poetry.dependencies]
 python = "^3.6"
-aio-odoorpc-base = ">=3.0"
+aio-odoorpc-base = ">=3.0.4"
 
 [tool.poetry.dev-dependencies]
 pytest = ">=5.2"
