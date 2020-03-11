@@ -2,7 +2,7 @@
 name = "aio-odoorpc"
 description = "Fast, simple Odoo RPC client with both synchronous and an asynchronous API"
 version = "1.3.16"
-license = "CC0-1.0"
+license = "MIT"
 authors = ["mbello <mbello@users.noreply.github.com>"]
 readme = "README.md"
 repository = "https://github.com/mbello/aio-odoorpc"
