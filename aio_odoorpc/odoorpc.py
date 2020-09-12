@@ -1,5 +1,5 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
-from aio_odoorpc_base.helpers import build_execute_kw_kwargs
+from aio_odoorpc_base.helpers import execute_kwargs
 from aio_odoorpc_base.sync import execute_kw, login
 from aio_odoorpc_base.protocols import T_HttpClient
 from aio_odoorpc.helpers import _fields_processor
@@ -58,7 +58,7 @@ class OdooRPC:
         data = self.execute_kw(model_name=model_name,
                                method='search_read',
                                method_arg=domain,
-                               method_kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
+                               method_kwargs=execute_kwargs(fields=fields, offset=offset,
                                                                      limit=limit, order=order),
                                http_client=http_client)
 
@@ -96,7 +96,7 @@ class OdooRPC:
             data = self.execute_kw(model_name=model_name,
                                    method='read',
                                    method_arg=ids,
-                                   method_kwargs=build_execute_kw_kwargs(
+                                   method_kwargs=execute_kwargs(
                                        fields=fields),
                                    http_client=http_client)
             return _fields_processor(data=data, fields=fields, setter__id_fields=setter__id_fields)
@@ -112,7 +112,7 @@ class OdooRPC:
         return self.execute_kw(model_name=model_name,
                                method='search',
                                method_arg=domain,
-                               method_kwargs=build_execute_kw_kwargs(
+                               method_kwargs=execute_kwargs(
                                    offset=offset, limit=limit, order=order),
                                http_client=http_client)
 
