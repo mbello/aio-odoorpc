@@ -3,7 +3,6 @@ from aio_odoorpc_base.helpers import odoo_base_url2jsonrpc_endpoint
 from aio_odoorpc import OdooRPC
 import httpx
 import requests
-import asyncio
 
 
 def test_sync_httpx1(url_db_user_pwd: list, benchmark):
@@ -56,11 +55,11 @@ def sync_test(url, db, user, pwd, http_client):
     
     for f in fields:
         for d in data1:
-            assert d.get(f)
+            assert f in d
     
     for f in fields:
         for d in data2:
-            assert d.get(f)
+            assert f in d
     
     ids1 = [d.get('id') for d in data1]
     ids2 = [d.get('id') for d in data2]

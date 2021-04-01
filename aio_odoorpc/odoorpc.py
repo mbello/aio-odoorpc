@@ -1,9 +1,19 @@
-from typing import Any, Callable, List, Optional, Tuple, Union
-from aio_odoorpc_base.helpers import build_execute_kw_kwargs
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from aio_odoorpc_base.helpers import execute_kwargs
 from aio_odoorpc_base.sync import execute_kw, login
 from aio_odoorpc_base.protocols import T_HttpClient
-from aio_odoorpc.helpers import _fields_processor
-import asyncio
+from .helpers import _fields_processor
+from aio_odoorpc import helpers
+
+# Domain operators.
+DOMAIN_OPERATORS = ('!', '|', '&')
+TERM_OPERATORS = ('=', '!=', '<>', '<=', '<', '>', '>=', '=?', '=like', '=ilike', 'like', 'not like', 'ilike',
+                  'not ilike', 'in', 'not in', 'child_of', 'parent_of')
+
+T_Domain = List[Union[Literal['!', '|', '&'],
+                      Tuple[str, Literal['=', '!=', '<>', '<=', '<', '>', '>=', '=?', '=like',
+                                         '=ilike', 'like', 'not like', 'ilike', 'not ilike', 'in',
+                                         'not in', 'child_of', 'parent_of'], Any]]]
 
 
 class OdooRPC:
@@ -14,6 +24,9 @@ class OdooRPC:
     http_client: T_HttpClient
     url: Optional[str]
     model_name: Optional[str]
+    getter_id_fields: Optional[helpers.T_GETTER_ID] = None
+    _context: Optional[dict] = None
+    _forced_context: Optional[dict] = None
 
     def __init__(self, *,
                  database: str,
@@ -45,43 +58,87 @@ class OdooRPC:
         new.model_name = default_model_name
         return new
 
-    def search_read(self, *,
-                    model_name: Optional[str] = None,
-                    domain: list = tuple(),
+    @property
+    def context(self) -> Union[Dict[str, Any], None]:
+        return self._context
+
+    @context.setter
+    def context(self, ctx: Union[Dict[str, Any], None]):
+        self.context = ctx
+
+    @property
+    def forced_context(self) -> Union[Dict[str, Any], None]:
+        return self._forced_context
+
+    @forced_context.setter
+    def forced_context(self, ctx: Union[Dict[str, Any], None]):
+        self._forced_context = ctx
+
+    def set_format_for_id_fields(self,
+                                 fmt: Literal["noop", "int", "dict", "list_of_int",
+                                              "list_of_dict", None, False]):
+
+        fmt = 'noop' if fmt is False or fmt is None else fmt
+
+        opts = {'noop': None,
+                'int': helpers.getter_id_as_int,
+                'dict': helpers.getter_id_as_dict,
+                'list_of_int': helpers.getter_id_as_list_of_int,
+                'list_of_dict': helpers.getter_id_as_list_of_dict}
+
+        self.getter_id_fields = opts[fmt]
+
+    def search(self, domain: Optional[T_Domain] = None, *,
+               offset: Optional[int] = None,
+               limit: Optional[int] = None,
+               order: Optional[str] = None,
+               count: Optional[bool] = None,
+               model_name: Optional[str] = None,
+               http_client: Optional[T_HttpClient] = None) -> List[int]:
+
+        return self.execute_kw(method='search',
+                               args=domain,
+                               kwargs=execute_kwargs(offset=offset, limit=limit,
+                                                     order=order, count=count),
+                               model_name=model_name,
+                               http_client=http_client)
+
+    def search_count(self, domain: Optional[T_Domain] = None, *,
+                     model_name: Optional[str] = None,
+                     http_client: Optional[T_HttpClient] = None) -> int:
+
+        return self.execute_kw(method='search_count',
+                               args=domain,
+                               model_name=model_name,
+                               http_client=http_client)
+
+    def search_read(self, domain: Optional[T_Domain] = None, *,
                     fields: Optional[List[str]] = None,
                     offset: Optional[int] = None,
                     limit: Optional[int] = None,
                     order: Optional[str] = None,
-                    http_client: Optional[T_HttpClient] = None,
-                    setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
+                    model_name: Optional[str] = None,
+                    http_client: Optional[T_HttpClient] = None) -> List[dict]:
 
-        data = self.execute_kw(model_name=model_name,
-                               method='search_read',
-                               method_arg=domain,
-                               method_kwargs=build_execute_kw_kwargs(fields=fields, offset=offset,
-                                                                     limit=limit, order=order),
+        data = self.execute_kw(method='search_read',
+                               args=domain,
+                               kwargs=execute_kwargs(
+                                   fields=fields, offset=offset, limit=limit, order=order),
+                               model_name=model_name,
                                http_client=http_client)
 
-        return _fields_processor(data=data, fields=fields, setter__id_fields=setter__id_fields)
+        return _fields_processor(data=data, fields=fields, getter_id=self.getter_id_fields)
 
-    def read(self, *,
-             model_name: Optional[str] = None,
-             ids: Optional[List[int]] = None,
+    def read(self, ids: Union[int, List[int]], *,
              fields: Optional[List[str]] = None,
              offset: Optional[int] = None,
              limit: Optional[int] = None,
-             order: Optional[int] = None,
-             http_client: Optional[T_HttpClient] = None,
-             setter__id_fields: Optional[Callable[[List], Any]] = None) -> List[dict]:
+             model_name: Optional[str] = None,
+             http_client: Optional[T_HttpClient] = None) -> List[dict]:
 
-        if ids is None:
-            return self.search_read(model_name=model_name,
-                                    fields=fields,
-                                    offset=offset,
-                                    limit=limit,
-                                    order=order,
-                                    http_client=http_client)
-        elif isinstance(ids, list) and len(ids) == 0:
+        ids = [ids] if isinstance(ids, int) else ids
+
+        if not ids:
             return list()
         else:
             if offset:
@@ -91,39 +148,39 @@ class OdooRPC:
                     ids = ids[offset:]
             if limit:
                 limit = min(limit, len(ids))
-                ids = ids[:limit-1]
+                ids = ids[:limit - 1]
 
-            data = self.execute_kw(model_name=model_name,
-                                   method='read',
-                                   method_arg=ids,
-                                   method_kwargs=build_execute_kw_kwargs(
-                                       fields=fields),
+            data = self.execute_kw(method='read',
+                                   args=ids,
+                                   kwargs=execute_kwargs(fields=fields),
+                                   model_name=model_name,
                                    http_client=http_client)
-            return _fields_processor(data=data, fields=fields, setter__id_fields=setter__id_fields)
 
-    def search(self, *,
-               model_name: Optional[str] = None,
-               domain: list = tuple(),
-               offset: Optional[int] = None,
-               limit: Optional[int] = None,
-               order: Optional[str] = None,
-               http_client: Optional[T_HttpClient] = None) -> List[int]:
+            return _fields_processor(data=data, fields=fields, getter_id=self.getter_id_fields)
 
-        return self.execute_kw(model_name=model_name,
-                               method='search',
-                               method_arg=domain,
-                               method_kwargs=build_execute_kw_kwargs(
-                                   offset=offset, limit=limit, order=order),
+    def copy_data(self, id: Union[List[int], int], *,
+                  default: Optional[Union[Dict[str, Any],
+                                          List[Dict[str, Any]]]] = None,
+                  model_name: Optional[str] = None,
+                  http_client: Optional[T_HttpClient] = None):
+        id = [id] if isinstance(id, int) else id
+        default = [default] if isinstance(default, dict) else default
+
+        return self.execute_kw(method='copy_data',
+                               args=id,
+                               kwargs={'default': default},
+                               model_name=model_name,
                                http_client=http_client)
 
-    def search_count(self, *,
-                     model_name: Optional[str] = None,
-                     domain: list = tuple(),
-                     http_client: Optional[T_HttpClient] = None) -> int:
+    def write(self, ids: Union[int, List[int]], vals: Dict[str, Any], *,
+              model_name: Optional[str] = None,
+              http_client: Optional[T_HttpClient] = None):
 
-        return self.execute_kw(model_name=model_name,
-                               method='search_count',
-                               method_arg=domain,
+        ids = [ids] if isinstance(ids, int) else ids
+        return self.execute_kw(method='write',
+                               args=ids,
+                               kwargs={'vals': vals},
+                               model_name=model_name,
                                http_client=http_client)
 
     def __base_args(self, http_client: Optional[T_HttpClient] = None) -> Tuple:
@@ -137,14 +194,15 @@ class OdooRPC:
         model_name = model_name if model_name else self.model_name
 
         if not self.uid:
-            raise RuntimeError(f'[aio-odoorpc] Error: uid has not been set. (did you forget to login?)')
+            raise RuntimeError(
+                f'[aio-odoorpc] Error: uid has not been set. (did you forget to login?)')
         if not model_name:
             raise RuntimeError(f'[aio-odoorpc] Error: model_name has not been set. '
                                f'Either set default_model_name or pass it in the parameter list.')
 
         return {'db': self.database, 'uid': self.uid, 'password': self.password, 'obj': model_name}
 
-    def login(self, *, http_client: Optional[T_HttpClient] = None, force: bool = False) -> int or None:
+    def login(self, *, http_client: Optional[T_HttpClient] = None, force: bool = False) -> Optional[int]:
         # If uid is already set, this method is a noop
         if not force and self.uid is not None:
             return None
@@ -160,14 +218,20 @@ class OdooRPC:
         return self.uid
 
     def execute_kw(self,
-                   model_name: Optional[str] = None, *,
                    method: str,
-                   method_arg: Optional[list] = tuple(),
-                   method_kwargs: Optional[dict] = None,
+                   args: Optional[list] = tuple(),
+                   kwargs: Optional[dict] = None, *,
+                   model_name: Optional[str] = None,
                    http_client: Optional[T_HttpClient] = None):
+
+        if self.forced_context or (self.context and 'context' not in kwargs):
+            ctx = kwargs.get('context', self.context)
+            ctx = self.forced_context if ctx is None else ctx.update(
+                self.forced_context or {})
+            kwargs['context'] = ctx
 
         return execute_kw(*self.__base_args(http_client),
                           **self.__base_kwargs(model_name),
                           method=method,
-                          args=method_arg,
-                          kw=method_kwargs)
+                          args=args,
+                          kw=kwargs)

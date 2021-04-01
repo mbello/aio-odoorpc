@@ -1,7 +1,6 @@
 import pytest
 from aio_odoorpc_base.helpers import odoo_base_url2jsonrpc_endpoint
 from aio_odoorpc import AsyncOdooRPC
-from aio_odoorpc.helpers import setter__id_id_as_int
 import httpx
 import aiohttp
 import asyncio
@@ -11,17 +10,19 @@ import asyncio
 async def test_async_httpx1(url_db_user_pwd: list, aio_benchmark):
     url, db, user, pwd = url_db_user_pwd
     async with httpx.AsyncClient(base_url=url) as session:
-        aio_benchmark(async_test, '', db, user, pwd, session)
+        await async_test('', db, user, pwd, session)
+        # aio_benchmark(async_test, '', db, user, pwd, session)
 
 
 @pytest.mark.asyncio
 async def test_async_httpx2(url_db_user_pwd: list, aio_benchmark):
     async with httpx.AsyncClient() as session:
-        aio_benchmark(async_test, *url_db_user_pwd, session)
+        await async_test(*url_db_user_pwd, session)
+        # aio_benchmark(async_test, *url_db_user_pwd, session)
 
 
 @pytest.mark.asyncio
-async def test_async_aiohttp(url_db_user_pwd: list):
+async def _test_async_aiohttp(url_db_user_pwd: list):
     async with aiohttp.ClientSession() as session:
         await async_test(*url_db_user_pwd, session)
 
@@ -39,7 +40,7 @@ async def test_async_readme1(url_db_user_pwd: list):
         try:
             # A default model name has not been set a instantiation time so we should
             # pass the model_name on every invocation. Here it should throw an exception.
-            await odoo.read()
+            await odoo.search_read()
         except RuntimeError:
             pass
         else:
@@ -50,13 +51,13 @@ async def test_async_readme1(url_db_user_pwd: list):
         # A missing 'fields' parameter means 'fetch all fields'.
         # Hence this call is very expensive, it fetches all fields for all
         # 'sale.order' records
-        all_orders_all_fields = await odoo.read(model_name='sale.order')
+        all_orders_all_fields = await odoo.search_read(model_name='sale.order', limit=10)
         
         # creates a copy of odoo obj setting default_model_name to 'sale.order'
         sale_order = odoo.new_for_model('sale.order')
         
         # now we do not need to pass model_name and it works!
-        all_orders_all_fields2 = await sale_order.read()
+        all_orders_all_fields2 = await sale_order.search_read(limit=10)
         
         large_orders = sale_order.search_read(domain=[['amount_total', '>', 10000]],
                                               fields=['partner_id', 'amount_total', 'date_order'])
@@ -72,8 +73,8 @@ async def test_bug_return_none(url_db_user_pwd: list):
                             url_jsonrpc_endpoint=url_json_endpoint)
         await odoo.login()
         
-        test = await odoo.search_read(model_name='sale.order', domain=[],
-                                      fields=[], setter__id_fields=setter__id_id_as_int)
+        odoo.set_format_for_id_fields('int')
+        test = await odoo.search_read(model_name='sale.order', domain=[], fields=[])
         assert test is not None
 
     
@@ -116,11 +117,11 @@ async def async_test(url, db, user, pwd, http_client):
     
     for f in fields:
         for d in data1:
-            assert d.get(f)
+            assert f in d
     
     for f in fields:
         for d in data2:
-            assert d.get(f)
+            assert f in d
     
     ids1 = [d.get('id') for d in data1]
     ids2 = [d.get('id') for d in data2]
@@ -138,3 +139,44 @@ async def async_test(url, db, user, pwd, http_client):
         
         for f in fields:
             assert data1[ids[i]][f] == data2[ids[i]][f]
+
+
+@pytest.mark.asyncio
+async def test_write(url_db_user_pwd: list):
+    url, db, user, pwd = url_db_user_pwd
+    url_json_endpoint = odoo_base_url2jsonrpc_endpoint(odoo_base_url=url)
+    
+    async with httpx.AsyncClient(base_url=url) as session:
+        odoo = AsyncOdooRPC(database=db, username_or_uid=user, password=pwd, http_client=session,
+                            url_jsonrpc_endpoint=url_json_endpoint, default_model_name='product.template')
+        await odoo.login()
+        odoo.set_format_for_id_fields('int')
+        products = await odoo.search_read(domain=[], fields=['list_price'], limit=10)
+    
+        new_price = 6.66
+    
+        await odoo.write(products[0]['id'], {'list_price': new_price})
+    
+        test = await odoo.read(products[0]['id'], fields=['list_price'])
+        assert test[0]['list_price'] == new_price
+        
+        ids = [p['id'] for p in products]
+        
+        print(ids)
+        
+        await odoo.write(ids, {'list_price': new_price})
+    
+        products = await odoo.read(ids=ids, fields=['list_price'])
+        
+        assert len(products) == len(ids)
+        for p in products:
+            assert p['list_price'] == new_price
+            
+        await odoo.write(ids, {'standard_price': new_price, 'weight': new_price})
+
+        products = await odoo.read(ids=ids, fields=['standard_price', 'weight'])
+        assert len(products) == len(ids)
+        for p in products:
+            assert p['standard_price'] == new_price
+            assert p['weight'] == new_price
+        

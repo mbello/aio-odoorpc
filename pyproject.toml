@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "aio-odoorpc"
 description = "Fast, simple Odoo RPC client with both synchronous and an asynchronous API"
-version = "1.3.16"
+version = "2.0.0"
 license = "MIT"
 authors = ["mbello <mbello@users.noreply.github.com>"]
 readme = "README.md"
@@ -11,7 +11,7 @@ keywords = ['odoorpc', 'asyncio', 'jsonrpc', 'odoo', 'ERPpeek']
 
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = ">=3.6"
 aio-odoorpc-base = ">=3.0.4"
 
 [tool.poetry.dev-dependencies]

@@ -1,26 +1,29 @@
 import pytest
 import asyncio
-from aio_odoorpc_base.helpers import odoo_base_url2jsonrpc_endpoint
 from bs4 import BeautifulSoup
 import httpx
 
 
 @pytest.fixture(scope='package')
 def url_db_user_pwd():
+    
+    return ['https://6978260-14-0.runbot39.odoo.com/', '6978260-14-0-all', 'admin', 'admin']
     with httpx.Client() as client:
         resp = client.get(url='http://runbot.odoo.com/runbot')
-    
+    print(resp.text)
     soup = BeautifulSoup(resp.text, features='html.parser')
-    tags = soup.find_all("td", class_="bg-success-light")
+    tags = soup.find_all("div", class_="slot-container")
     
     urls = []
     
     for tag in tags:
         try:
-            url = tag.div.div.find('a', title='Sign in on this build')['href']
-            url_parts = url.split('?db=')
-            if len(url_parts) == 2:
-                return [url_parts[0], url_parts[1], 'demo', 'demo']
+            if tag.div.find('span', class_="btn-success"):
+                url = tag.div.find('a', class_='fa-sign-in')['href']
+                return [url, 'all', 'demo', 'demo']
+                # url_parts = url.split('?db=')
+                # if len(url_parts) == 2:
+                    # return [url_parts[0], url_parts[1], 'admin', 'admin']
         except:
             pass
     
