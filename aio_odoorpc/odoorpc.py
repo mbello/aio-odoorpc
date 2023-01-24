@@ -34,7 +34,8 @@ class OdooRPC:
                  password: str,
                  http_client: Optional[T_HttpClient] = None,
                  url_jsonrpc_endpoint: Optional[str] = None,
-                 default_model_name: Optional[str] = None):
+                 default_model_name: Optional[str] = None,
+                 context: Optional[dict]=None):
         self.database = database
         self.username = username_or_uid if isinstance(
             username_or_uid, str) else None
@@ -44,12 +45,13 @@ class OdooRPC:
         self.http_client = http_client
         self.url = url_jsonrpc_endpoint if url_jsonrpc_endpoint is not None else ''
         self.model_name = default_model_name
+        self._context = context
 
     def __copy__(self):
         username_or_uid = self.uid if self.uid else self.username
         new = type(self)(database=self.database, username_or_uid=username_or_uid,
                          password=self.password, http_client=self.http_client,
-                         url_jsonrpc_endpoint=self.url, default_model_name=self.model_name)
+                         url_jsonrpc_endpoint=self.url, default_model_name=self.model_name,context=self._context)
         new.username = self.username
         return new
 
@@ -226,8 +228,10 @@ class OdooRPC:
 
         if self.forced_context or (self.context and 'context' not in kwargs):
             ctx = kwargs.get('context', self.context)
-            ctx = self.forced_context if ctx is None else ctx.update(
-                self.forced_context or {})
+            if ctx is None:
+                ctx = self._forced_context 
+            else:
+                ctx.update(self._forced_context or ctx)
             kwargs['context'] = ctx
 
         return execute_kw(*self.__base_args(http_client),
